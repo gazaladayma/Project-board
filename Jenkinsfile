@@ -34,5 +34,25 @@ pipeline {
                 }
             }
         }
+
+        stage('Trivy Filesystem Scan') {
+            steps {
+                sh '''
+                    trivy fs \
+                      --scanners vuln,misconfig,secret \
+                      --format json \
+                      --output trivy-fs-report.json \
+                      .
+                '''
+            }
+        }
+    }
+
+    post {
+        always {
+            archiveArtifacts artifacts: 'trivy-fs-report.json',
+                             allowEmptyArchive: true,
+                             fingerprint: true
+        }
     }
 }
