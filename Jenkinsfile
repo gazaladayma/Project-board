@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     tools {
-        jdk 'jdk17'
+        jdk 'jdk21'
         maven 'maven3'
     }
 
@@ -29,7 +29,7 @@ pipeline {
                         mvn org.sonarsource.scanner.maven:sonar-maven-plugin:5.8.0.7211:sonar \
                           -Dsonar.projectKey=project-board \
                           -Dsonar.host.url=http://10.50.11.227:9000 \
-                          -Dsonar.login="$SONAR_TOKEN"
+                          -Dsonar.token="$SONAR_TOKEN"
                     '''
                 }
             }
