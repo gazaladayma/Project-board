@@ -29,7 +29,9 @@ pipeline {
                         mvn org.sonarsource.scanner.maven:sonar-maven-plugin:5.8.0.7211:sonar \
                           -Dsonar.projectKey=project-board \
                           -Dsonar.host.url=http://10.50.11.227:9000 \
-                          -Dsonar.token="$SONAR_TOKEN"
+                          -Dsonar.token="$SONAR_TOKEN" \
+                          -Dsonar.qualitygate.wait=true \
+                          -Dsonar.qualitygate.timeout=300
                     '''
                 }
             }
