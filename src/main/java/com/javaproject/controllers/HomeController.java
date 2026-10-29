@@ -5,10 +5,11 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.JdbcUserDetailsManager;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -31,42 +32,45 @@ public class HomeController {
 
     @Autowired
     @Lazy
-    private BCryptPasswordEncoder passwordEncoder;
+    private PasswordEncoder passwordEncoder;
 
     @Autowired
     private JdbcUserDetailsManager jdbcUserDetailsManager;
 
     @GetMapping("/newUser")
-    public String newUser(Model model) {
-
-        List<String> authorities = da.getAuthorities();
-        model.addAttribute("authorities", authorities);
+    public String newUser() {
         return "new-user";
     }
 
     @PostMapping("/addUser")
-    public String addUser(@RequestParam String userName, @RequestParam String password,
-            @RequestParam String[] authorities, Model model, RedirectAttributes redirectAttrs) {
+    public String addUser(@RequestParam String userName,
+            @RequestParam String password,
+            Model model,
+            RedirectAttributes redirectAttrs) {
 
-        List<GrantedAuthority> authorityList = new ArrayList<>();
+        String normalizedUserName = userName.trim();
 
-        for (String authority : authorities) {
-            authorityList.add(new SimpleGrantedAuthority(authority));
-        }
-        String encodedPassword = passwordEncoder.encode(password);
-
-        // check existing user
-        if (jdbcUserDetailsManager.userExists(userName)) {
-            model.addAttribute("errorMsg", "User name already Exists. Try a different user name.");
-            model.addAttribute("authorities", authorityList);
+        if (normalizedUserName.isEmpty() || password.isBlank()) {
+            model.addAttribute("errorMsg", "User name and password are required.");
             return "new-user";
-        } else {
-            User user = new User(userName, encodedPassword, authorityList);
-
-            jdbcUserDetailsManager.createUser(user);
-            redirectAttrs.addFlashAttribute("userAddedMsg", "User succesfully added!");
-            return "redirect:/";
         }
+
+        if (jdbcUserDetailsManager.userExists(normalizedUserName)) {
+            model.addAttribute("errorMsg",
+                    "User name already exists. Try a different user name.");
+            return "new-user";
+        }
+
+        User user = new User(
+                normalizedUserName,
+                passwordEncoder.encode(password),
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+
+        jdbcUserDetailsManager.createUser(user);
+        redirectAttrs.addFlashAttribute(
+                "userAddedMsg", "User successfully added!");
+
+        return "redirect:/";
     }
 
     @GetMapping("/")
@@ -97,12 +101,19 @@ public class HomeController {
         return "secured/addReview";
     }
 
-    // edit the review
+    // Edit pages are manager-only; also validate the review/game association.
     @GetMapping("/{gameId}/reviews/{id}")
     public String editReview(@PathVariable Long gameId, @PathVariable Long id, Model model) {
         Review review = da.getReview(id);
+        BoardGame boardgame = da.getBoardGame(gameId);
+
+        if (review == null || boardgame == null
+                || !java.util.Objects.equals(review.getGameId(), gameId)) {
+            return "redirect:/permission-denied";
+        }
+
         model.addAttribute("review", review);
-        model.addAttribute("boardgame", da.getBoardGame(gameId));
+        model.addAttribute("boardgame", boardgame);
         return "secured/addReview";
     }
 
@@ -120,25 +131,51 @@ public class HomeController {
     }
 
     @PostMapping("/reviewAdded")
-    public String reviewAdded(@ModelAttribute Review review) {
+    public String reviewAdded(
+            @ModelAttribute Review review,
+            Authentication authentication) {
+
         int returnValue;
-        // if id exists, edit
+
+        // Editing an existing review is restricted to managers.
         if (review.getId() != null) {
+            boolean isManager = authentication != null
+                    && authentication.getAuthorities().stream()
+                        .anyMatch(authority ->
+                            authority.getAuthority().equals("ROLE_MANAGER"));
+
+            if (!isManager) {
+                return "redirect:/permission-denied";
+            }
+
+            // Confirm the review exists and belongs to the submitted game.
+            Review existingReview = da.getReview(review.getId());
+            if (existingReview == null
+                    || !java.util.Objects.equals(
+                            existingReview.getGameId(), review.getGameId())) {
+                return "redirect:/permission-denied";
+            }
+
             returnValue = da.editReview(review);
         } else {
-            // if id not exists, add
+            // Authenticated users may submit new reviews.
             returnValue = da.addReview(review);
         }
+
         System.out.println("return value is: " + returnValue);
-        return "redirect:/" + review.getGameId() +
-                "/reviews";
+        return "redirect:/" + review.getGameId() + "/reviews";
     }
 
-    @GetMapping("/deleteReview/{id}")
+    @PostMapping("/deleteReview/{id}")
     public String deleteReview(@PathVariable Long id) {
-        Long gameId = da.getReview(id).getGameId();
-        int returnValue = da.deleteReview(id);
-        System.out.println("return value is: " + returnValue);
+        Review review = da.getReview(id);
+
+        if (review == null) {
+            return "redirect:/";
+        }
+
+        Long gameId = review.getGameId();
+        da.deleteReview(id);
         return "redirect:/" + gameId + "/reviews";
     }
 

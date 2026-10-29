@@ -15,3 +15,15 @@ target/
 # Operating system files
 .DS_Store
 Thumbs.db
+
+# Local backups created during security hardening
+*.before-security-fixes
+*.before-hardening
+*.before-boot4-migration
+*.before-dependency-fixes
+*.pre-security-upgrade
+*.before-role-fix
+*.before-api-security-tests
+
+# Temporary local backup
+pom.xml.before-sonar-cleanup

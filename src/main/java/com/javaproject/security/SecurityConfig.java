@@ -2,89 +2,149 @@ package com.javaproject.security;
 
 import javax.sql.DataSource;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Lazy;
-import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.NoOpPasswordEncoder;
 import org.springframework.security.provisioning.JdbcUserDetailsManager;
+import org.springframework.security.web.SecurityFilterChain;
 
-@EnableWebSecurity
-public class SecurityConfig extends WebSecurityConfigurerAdapter {
-
-    private LoggingAccessDeniedHandler accessDeniedHandler;
-
-    @Autowired
-    public void setAccessDeniedHandler(LoggingAccessDeniedHandler accessDeniedHandler) {
-        this.accessDeniedHandler = accessDeniedHandler;
-    }
+@Configuration
+public class SecurityConfig {
 
     @Bean
-    public BCryptPasswordEncoder passwordEncoder() {
+    public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    @Autowired
-    @Lazy
-    private BCryptPasswordEncoder passwordEncoder;
-
-    @Autowired
-    private DataSource dataSource;
-
-    /**
-     * Creates a bean of type JdbcUserDetailsManager that will be used in
-     * HomeController
-     * 
-     * @return an instance configured to use our datasource
-     * @throws Exception
-     */
     @Bean
-    public JdbcUserDetailsManager jdbcUserDetailsManager() throws Exception {
-        // provides crud operations for users
-        JdbcUserDetailsManager jdbcUserDetailsManager = new JdbcUserDetailsManager();
-
-        // Link up with our datasource
-        jdbcUserDetailsManager.setDataSource(dataSource);
-        return jdbcUserDetailsManager;
+    public JdbcUserDetailsManager jdbcUserDetailsManager(DataSource dataSource) {
+        return new JdbcUserDetailsManager(dataSource);
     }
 
-    @Override
-    protected void configure(HttpSecurity http) throws Exception {
-        http.authorizeRequests()
-                .antMatchers("/user/**").hasAnyRole("USER", "MANAGER") // sets up authorization
-                .antMatchers("/secured/**").hasAnyRole("USER", "MANAGER")
-                .antMatchers("/manager/**").hasRole("MANAGER")
-                .antMatchers("/h2-console/**").permitAll()
-                .antMatchers("/", "/**").permitAll() // allows access to index in templates
-                .and() // allows us to chain
-                .formLogin().loginPage("/login")
+    @Bean
+    public ApplicationRunner initializeSecurityUsers(
+            JdbcTemplate jdbcTemplate,
+            JdbcUserDetailsManager userDetailsManager,
+            PasswordEncoder passwordEncoder,
+            @Value("${app.security.seed-demo-users:false}") boolean seedDemoUsers) {
+
+        return args -> {
+            jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    username VARCHAR(50) NOT NULL PRIMARY KEY,
+                    password VARCHAR(500) NOT NULL,
+                    enabled BOOLEAN NOT NULL
+                )
+                """);
+
+            jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS authorities (
+                    username VARCHAR(50) NOT NULL,
+                    authority VARCHAR(50) NOT NULL,
+                    CONSTRAINT fk_authorities_users
+                        FOREIGN KEY (username) REFERENCES users(username)
+                )
+                """);
+
+            jdbcTemplate.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS ix_auth_username
+                ON authorities (username, authority)
+                """);
+
+            if (seedDemoUsers) {
+                if (!userDetailsManager.userExists("bugs")) {
+                    userDetailsManager.createUser(
+                        User.withUsername("bugs")
+                            .password(passwordEncoder.encode("bunny"))
+                            .roles("USER")
+                            .build()
+                    );
+                }
+
+                if (!userDetailsManager.userExists("daffy")) {
+                    userDetailsManager.createUser(
+                        User.withUsername("daffy")
+                            .password(passwordEncoder.encode("duck"))
+                            .roles("USER", "MANAGER")
+                            .build()
+                    );
+                }
+            }
+        };
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            LoggingAccessDeniedHandler accessDeniedHandler) throws Exception {
+
+        http
+            .authorizeHttpRequests(auth -> auth
+                // Block the embedded database console.
+                .requestMatchers("/h2-console/**").denyAll()
+
+                // Manager-only page and write operations.
+                .requestMatchers("/manager", "/manager/**").hasRole("MANAGER")
+                .requestMatchers(HttpMethod.GET, "/secured/addBoardGame")
+                    .hasRole("MANAGER")
+                .requestMatchers(HttpMethod.GET, "/*/reviews/*")
+                    .hasRole("MANAGER")
+                .requestMatchers(HttpMethod.POST, "/boardgameAdded")
+                    .hasRole("MANAGER")
+                .requestMatchers(HttpMethod.POST, "/deleteReview/**")
+                    .hasRole("MANAGER")
+                .requestMatchers(HttpMethod.POST, "/boardgames")
+                    .hasRole("MANAGER")
+
+                // Authenticated user pages and review creation.
+                .requestMatchers("/user", "/user/**", "/secured/**")
+                    .hasAnyRole("USER", "MANAGER")
+                .requestMatchers(HttpMethod.POST, "/reviewAdded")
+                    .hasAnyRole("USER", "MANAGER")
+
+                // Public pages and read-only REST endpoints.
+                .requestMatchers(
+                    "/", "/newUser", "/addUser", "/login",
+                    "/permission-denied", "/error",
+                    "/css/**", "/js/**", "/images/**",
+                    "/favicon.ico"
+                ).permitAll()
+                .requestMatchers(HttpMethod.GET, "/boardgames", "/boardgames/**")
+                    .permitAll()
+                .requestMatchers(HttpMethod.GET, "/")
+                    .permitAll()
+                .requestMatchers(HttpMethod.GET, "/{id}")
+                    .permitAll()
+                .requestMatchers(HttpMethod.GET, "/{id}/reviews")
+                    .permitAll()
+
+                // No broad permitAll fallback.
+                .anyRequest().authenticated()
+            )
+            .formLogin(form -> form
+                .loginPage("/login")
                 .defaultSuccessUrl("/secured")
-                .and()
-                .logout().invalidateHttpSession(true)
+                .permitAll()
+            )
+            .logout(logout -> logout
+                .invalidateHttpSession(true)
                 .clearAuthentication(true)
-                .and()
-                .exceptionHandling()
-                .accessDeniedHandler(accessDeniedHandler);
+                .permitAll()
+            )
+            .exceptionHandling(ex -> ex
+                .accessDeniedHandler(accessDeniedHandler)
+            )
+            .headers(headers -> headers
+                .frameOptions(frame -> frame.sameOrigin())
+            );
 
-        http.csrf().disable();
-        http.headers().frameOptions().disable();
-    }
-
-    @Override
-    protected void configure(AuthenticationManagerBuilder auth) throws Exception {
-
-        auth.jdbcAuthentication()
-                .dataSource(dataSource)
-                .withDefaultSchema()
-                .passwordEncoder(passwordEncoder)
-                .withUser("bugs")
-                .password(passwordEncoder.encode("bunny")).roles("USER")
-                .and()
-                .withUser("daffy")
-                .password(passwordEncoder.encode("duck")).roles("USER", "MANAGER");
+        return http.build();
     }
 }

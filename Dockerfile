@@ -1,28 +1,34 @@
 # ===== Build Stage =====
-FROM maven:3.9.9-eclipse-temurin-17 AS build
-WORKDIR /app
-# rrr
-# Copy pom.xml first to leverage Docker layer caching
-COPY pom.xml .
+FROM maven:3.9.9-eclipse-temurin-21 AS build
 
-# Pre-download dependencies (faster rebuilds)
+WORKDIR /app
+
+COPY pom.xml .
 RUN mvn -B -q -DskipTests dependency:go-offline
 
-# Copy project source
 COPY src ./src
-
-# Build the JAR (skip tests for faster build)
-RUN mvn clean package -DskipTests
+RUN mvn -B clean package -DskipTests
 
 # ===== Runtime Stage =====
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:21-jre-alpine
+
+# Apply current Alpine security updates
+RUN apk update && apk upgrade --no-cache
+
 WORKDIR /app
 
-# Copy built jar from build stage
-COPY --from=build /app/target/*.jar app.jar
+# Create a dedicated non-root user and group
+RUN addgroup -S -g 10001 appgroup \
+    && adduser -S -D -H -u 10001 -G appgroup appuser
 
-# Expose app port
+COPY --from=build --chown=10001:10001 /app/target/*.jar /app/app.jar
+
+USER 10001:10001
+
 EXPOSE 8080
 
-# Run the app
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Check the application's HTTP endpoint
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+    CMD wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1
+
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]
