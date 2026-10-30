@@ -1,0 +1,87 @@
+pipeline {
+    agent any
+
+    tools {
+        jdk 'jdk21'
+        maven 'maven3'
+    }
+
+    environment {
+        IMAGE_NAME = 'project-board'
+    }
+
+    stages {
+        stage('Compile') {
+            steps {
+                sh 'mvn -B compile'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh 'mvn -B test'
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
+                    sh '''
+                        mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:5.8.0.7211:sonar \
+                          -Dsonar.projectKey=project-board \
+                          -Dsonar.host.url=http://10.50.11.227:9000 \
+                          -Dsonar.token="$SONAR_TOKEN"
+                    '''
+                }
+            }
+        }
+
+        stage('Trivy Filesystem Scan') {
+            steps {
+                sh '''
+                    trivy fs --scanners vuln,misconfig,secret \
+                      --format json --output trivy-fs-report.json .
+                '''
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    env.IMAGE_TAG = sh(
+                        script: 'git rev-parse --short=12 HEAD',
+                        returnStdout: true
+                    ).trim()
+                }
+                sh '''
+                    docker build --pull \
+                      --tag "${IMAGE_NAME}:${IMAGE_TAG}" .
+                    docker image inspect "${IMAGE_NAME}:${IMAGE_TAG}"
+                '''
+            }
+        }
+
+        stage('Trivy Image Scan') {
+            steps {
+                sh '''
+                    trivy image --scanners vuln \
+                      --severity HIGH,CRITICAL \
+                      --exit-code 1 \
+                      --format json \
+                      --output trivy-image-report.json \
+                      "${IMAGE_NAME}:${IMAGE_TAG}"
+                '''
+            }
+        }
+    }
+
+    post {
+        always {
+            archiveArtifacts(
+                artifacts: 'trivy-fs-report.json,trivy-image-report.json',
+                allowEmptyArchive: true,
+                fingerprint: true
+            )
+        }
+    }
+}
