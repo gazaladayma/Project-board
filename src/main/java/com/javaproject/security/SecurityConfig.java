@@ -64,7 +64,9 @@ public class SecurityConfig {
                 // Block the embedded database console.
                 .requestMatchers("/h2-console/**").denyAll()
 
-                // Manager-only page and write operations.
+                // Manager-only user administration and write operations.
+                .requestMatchers("/newUser").hasRole(ROLE_MANAGER)
+                .requestMatchers(HttpMethod.POST, "/addUser").hasRole(ROLE_MANAGER)
                 .requestMatchers("/manager", "/manager/**").hasRole(ROLE_MANAGER)
                 .requestMatchers(HttpMethod.GET, "/secured/addBoardGame")
                     .hasRole(ROLE_MANAGER)
@@ -85,7 +87,7 @@ public class SecurityConfig {
 
                 // Public pages and read-only REST endpoints.
                 .requestMatchers(
-                    "/", "/newUser", "/addUser", "/login",
+                    "/", "/login",
                     "/permission-denied", "/error",
                     "/css/**", "/js/**", "/images/**",
                     "/favicon.ico"

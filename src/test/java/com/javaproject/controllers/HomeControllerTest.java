@@ -2,6 +2,7 @@ package com.javaproject.controllers;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -9,6 +10,7 @@ import static org.mockito.Mockito.when;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -20,6 +22,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import com.javaproject.beans.BoardGame;
 import com.javaproject.beans.Review;
 import com.javaproject.database.DatabaseAccess;
+import org.springframework.security.core.userdetails.User;
 
 @ExtendWith(MockitoExtension.class)
 class HomeControllerTest {
@@ -38,7 +41,12 @@ class HomeControllerTest {
 
     @Test
     void testNewUserPage() {
-        assertEquals("new-user", controller.newUser());
+        Model model = new ExtendedModelMap();
+
+        assertEquals("new-user", controller.newUser(model));
+        assertEquals(
+                java.util.List.of("ROLE_MANAGER", "ROLE_USER"),
+                model.getAttribute("authorities"));
     }
 
     @Test
@@ -46,8 +54,8 @@ class HomeControllerTest {
         Model model = new ExtendedModelMap();
 
         String result = controller.addUser(
-                "   ", "password", model,
-                new RedirectAttributesModelMap());
+                "   ", "password", java.util.List.of("ROLE_USER"),
+                model, new RedirectAttributesModelMap());
 
         assertEquals("new-user", result);
         assertNotNull(model.getAttribute("errorMsg"));
@@ -58,8 +66,32 @@ class HomeControllerTest {
         Model model = new ExtendedModelMap();
 
         String result = controller.addUser(
-                "newuser", "   ", model,
-                new RedirectAttributesModelMap());
+                "newuser", "   ", java.util.List.of("ROLE_USER"),
+                model, new RedirectAttributesModelMap());
+
+        assertEquals("new-user", result);
+        assertNotNull(model.getAttribute("errorMsg"));
+    }
+
+    @Test
+    void testAddUserWithoutSelectedRole() {
+        Model model = new ExtendedModelMap();
+
+        String result = controller.addUser(
+                "newuser", "password", null,
+                model, new RedirectAttributesModelMap());
+
+        assertEquals("new-user", result);
+        assertNotNull(model.getAttribute("errorMsg"));
+    }
+
+    @Test
+    void testAddUserWithInvalidRole() {
+        Model model = new ExtendedModelMap();
+
+        String result = controller.addUser(
+                "newuser", "password", java.util.List.of("ROLE_ADMIN"),
+                model, new RedirectAttributesModelMap());
 
         assertEquals("new-user", result);
         assertNotNull(model.getAttribute("errorMsg"));
@@ -73,15 +105,16 @@ class HomeControllerTest {
         Model model = new ExtendedModelMap();
 
         String result = controller.addUser(
-                " existinguser ", "password", model,
-                new RedirectAttributesModelMap());
+                " existinguser ", "password",
+                java.util.List.of("ROLE_USER"),
+                model, new RedirectAttributesModelMap());
 
         assertEquals("new-user", result);
         assertNotNull(model.getAttribute("errorMsg"));
     }
 
     @Test
-    void testAddUserSuccessfully() {
+    void testAddUserSuccessfullyWithUserRole() {
         when(jdbcUserDetailsManager.userExists("newuser"))
                 .thenReturn(false);
         when(passwordEncoder.encode("password"))
@@ -92,6 +125,7 @@ class HomeControllerTest {
 
         String result = controller.addUser(
                 " newuser ", "password",
+                java.util.List.of("ROLE_USER"),
                 new ExtendedModelMap(), redirectAttributes);
 
         assertEquals("redirect:/", result);
@@ -99,7 +133,50 @@ class HomeControllerTest {
                 "User successfully added!",
                 redirectAttributes.getFlashAttributes().get("userAddedMsg"));
 
-        verify(jdbcUserDetailsManager).createUser(any());
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(jdbcUserDetailsManager).createUser(captor.capture());
+
+        assertEquals("newuser", captor.getValue().getUsername());
+        assertEquals("encoded-password", captor.getValue().getPassword());
+        assertTrue(captor.getValue().getAuthorities().stream()
+                .anyMatch(authority -> authority.getAuthority().equals("ROLE_USER")));
+    }
+
+    @Test
+    void testAddUserSuccessfullyWithManagerRole() {
+        when(jdbcUserDetailsManager.userExists("manager"))
+                .thenReturn(false);
+        when(passwordEncoder.encode("password"))
+                .thenReturn("encoded-password");
+
+        controller.addUser(
+                "manager", "password",
+                java.util.List.of("ROLE_MANAGER"),
+                new ExtendedModelMap(), new RedirectAttributesModelMap());
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(jdbcUserDetailsManager).createUser(captor.capture());
+
+        assertTrue(captor.getValue().getAuthorities().stream()
+                .anyMatch(authority -> authority.getAuthority().equals("ROLE_MANAGER")));
+    }
+
+    @Test
+    void testAddUserSuccessfullyWithBothRoles() {
+        when(jdbcUserDetailsManager.userExists("bothroles"))
+                .thenReturn(false);
+        when(passwordEncoder.encode("password"))
+                .thenReturn("encoded-password");
+
+        controller.addUser(
+                "bothroles", "password",
+                java.util.List.of("ROLE_MANAGER", "ROLE_USER"),
+                new ExtendedModelMap(), new RedirectAttributesModelMap());
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(jdbcUserDetailsManager).createUser(captor.capture());
+
+        assertEquals(2, captor.getValue().getAuthorities().size());
     }
 
     @Test

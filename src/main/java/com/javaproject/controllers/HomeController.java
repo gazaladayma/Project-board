@@ -50,35 +50,58 @@ public class HomeController {
     private JdbcUserDetailsManager jdbcUserDetailsManager;
 
     @GetMapping("/newUser")
-    public String newUser() {
+    public String newUser(Model model) {
+        model.addAttribute("authorities", List.of("ROLE_MANAGER", "ROLE_USER"));
         return VIEW_NEW_USER;
     }
 
     @PostMapping("/addUser")
-    public String addUser(@RequestParam String userName,
+    public String addUser(
+            @RequestParam String userName,
             @RequestParam String password,
+            @RequestParam(required = false) List<String> authorities,
             Model model,
             RedirectAttributes redirectAttrs) {
 
         String normalizedUserName = userName.trim();
 
+        List<String> allowedAuthorities =
+                List.of("ROLE_MANAGER", "ROLE_USER");
+
         if (normalizedUserName.isEmpty() || password.isBlank()) {
-            model.addAttribute("errorMsg", "User name and password are required.");
+            model.addAttribute("errorMsg",
+                    "User name and password are required.");
+            model.addAttribute("authorities", allowedAuthorities);
+            return VIEW_NEW_USER;
+        }
+
+        if (authorities == null || authorities.isEmpty()
+                || !allowedAuthorities.containsAll(authorities)) {
+            model.addAttribute("errorMsg",
+                    "Please select at least one valid role.");
+            model.addAttribute("authorities", allowedAuthorities);
             return VIEW_NEW_USER;
         }
 
         if (jdbcUserDetailsManager.userExists(normalizedUserName)) {
             model.addAttribute("errorMsg",
                     "User name already exists. Try a different user name.");
+            model.addAttribute("authorities", allowedAuthorities);
             return VIEW_NEW_USER;
         }
+
+        List<SimpleGrantedAuthority> grantedAuthorities = authorities.stream()
+                .distinct()
+                .map(SimpleGrantedAuthority::new)
+                .toList();
 
         User user = new User(
                 normalizedUserName,
                 passwordEncoder.encode(password),
-                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+                grantedAuthorities);
 
         jdbcUserDetailsManager.createUser(user);
+
         redirectAttrs.addFlashAttribute(
                 "userAddedMsg", "User successfully added!");
 
@@ -92,13 +115,13 @@ public class HomeController {
         return "index";
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/{id:\\d+}")
     public String getBoardgameDetail(@PathVariable Long id, Model model) {
         model.addAttribute(BOARDGAME, da.getBoardGame(id));
         return BOARDGAME;
     }
 
-    @GetMapping("/{id}/reviews")
+    @GetMapping("/{id:\\d+}/reviews")
     public String getReviews(@PathVariable Long id, Model model) {
         model.addAttribute(BOARDGAME, da.getBoardGame(id));
         model.addAttribute("reviews", da.getReviews(id));
