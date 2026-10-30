@@ -51,7 +51,7 @@ public class BoardGameController {
      * @return the ResponseEntity
      */
     @GetMapping("/{id}")
-    public ResponseEntity<?> getBoardGame(@PathVariable Long id) {
+    public ResponseEntity<Object> getBoardGame(@PathVariable Long id) {
         BoardGame boardGame = da.getBoardGame(id);
         if (boardGame != null) {
             return ResponseEntity.ok(boardGame);
@@ -61,7 +61,7 @@ public class BoardGameController {
     }
 
     @PostMapping(consumes = "application/json")
-    public ResponseEntity<?> postBoardGame(@RequestBody BoardGame boardGame) {
+    public ResponseEntity<Object> postBoardGame(@RequestBody BoardGame boardGame) {
         try {
             Long id = da.addBoardGame(boardGame);
             boardGame.setId(id);
