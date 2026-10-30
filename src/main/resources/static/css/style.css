@@ -1,7 +1,43 @@
+/* General application styles */
+body {
+    min-height: 100vh;
+    background-color: #F3F0FF;
+    color: #30234A;
+}
+
+/* Homepage heading */
+main.container h1 {
+    color: #563A91;
+    font-weight: 700;
+}
+
+/* Board game cards */
+main.container .list-group-item {
+    background-color: #FFFFFF;
+    border: 1px solid #DED6F7;
+    border-radius: 12px;
+    color: #563A91;
+    box-shadow: 0 3px 10px rgba(65, 40, 110, 0.08);
+    transition: all 0.2s ease-in-out;
+}
+
+main.container .list-group-item:hover {
+    background-color: #E8DFFF;
+    color: #39246B;
+    transform: translateY(-2px);
+}
+
+/* Links */
+main.container a {
+    color: #6941A5;
+}
+
+/* Error messages */
 .error {
     color: red;
 }
 
+/* Text areas */
 textarea {
     width: 50rem;
     height: 10rem;
