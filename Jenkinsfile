@@ -54,6 +54,17 @@ pipeline {
             }
         }
 
+        stage('JaCoCo Report') {
+            steps {
+                sh '''
+                    set -eu
+                    mvn -B jacoco:report
+                    test -s target/site/jacoco/jacoco.xml
+                    echo "JaCoCo XML report generated successfully."
+                '''
+            }
+        }
+
         stage('SonarQube Analysis') {
             steps {
                 withCredentials([string(
