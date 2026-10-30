@@ -168,6 +168,45 @@ pipeline {
                 '''
             }
         }
+
+        stage('Deploy to EKS') {
+            steps {
+                sh '''
+                    set -eu
+
+                    KUBECTL_BIN="${WORKSPACE}/.tools/kubectl"
+                    IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+                    KUBECONFIG_FILE="${WORKSPACE}/.kube/config"
+
+                    mkdir -p "${WORKSPACE}/.kube"
+
+                    aws eks update-kubeconfig \
+                      --name project-board-cluster \
+                      --region "${AWS_REGION}" \
+                      --kubeconfig "${KUBECONFIG_FILE}"
+
+                    export KUBECONFIG="${KUBECONFIG_FILE}"
+
+                    echo "Deploying image: ${IMAGE_URI}"
+
+                    "${KUBECTL_BIN}" -n project-board \
+                      set image deployment/boardgame-deployment \
+                      boardgame="${IMAGE_URI}"
+
+                    "${KUBECTL_BIN}" -n project-board \
+                      rollout status deployment/boardgame-deployment \
+                      --timeout=180s
+
+                    ACTUAL_IMAGE=$("${KUBECTL_BIN}" -n project-board \
+                      get deployment boardgame-deployment \
+                      -o 'jsonpath={.spec.template.spec.containers[?(@.name=="boardgame")].image}')
+
+                    test "${ACTUAL_IMAGE}" = "${IMAGE_URI}"
+
+                    echo "Verified deployed image: ${ACTUAL_IMAGE}"
+                '''
+            }
+        }
     }
 
     post {
