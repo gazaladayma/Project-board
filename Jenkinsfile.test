@@ -64,6 +64,13 @@ pipeline {
         stage('Trivy Image Scan') {
             steps {
                 sh '''
+                    echo "===== DISK SPACE ====="
+                    df -h
+                    echo "===== INODE USAGE ====="
+                    df -i
+                    echo "===== DOCKER DISK USAGE ====="
+                    docker system df
+
                     trivy image --scanners vuln \
                       --severity HIGH,CRITICAL \
                       --exit-code 1 \
