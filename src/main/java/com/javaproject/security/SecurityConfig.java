@@ -3,13 +3,11 @@ package com.javaproject.security;
 import javax.sql.DataSource;
 
 import org.springframework.boot.ApplicationRunner;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.core.userdetails.User;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.provisioning.JdbcUserDetailsManager;
@@ -17,6 +15,7 @@ import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
 public class SecurityConfig {
+    private static final String ROLE_MANAGER = "MANAGER";
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -29,12 +28,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public ApplicationRunner initializeSecurityUsers(
-            JdbcTemplate jdbcTemplate,
-            JdbcUserDetailsManager userDetailsManager,
-            PasswordEncoder passwordEncoder,
-            @Value("${app.security.seed-demo-users:false}") boolean seedDemoUsers) {
-
+    public ApplicationRunner initializeSecurityUsers(JdbcTemplate jdbcTemplate) {
         return args -> {
             jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS users (
@@ -57,33 +51,13 @@ public class SecurityConfig {
                 CREATE UNIQUE INDEX IF NOT EXISTS ix_auth_username
                 ON authorities (username, authority)
                 """);
-
-            if (seedDemoUsers) {
-                if (!userDetailsManager.userExists("bugs")) {
-                    userDetailsManager.createUser(
-                        User.withUsername("bugs")
-                            .password(passwordEncoder.encode("bunny"))
-                            .roles("USER")
-                            .build()
-                    );
-                }
-
-                if (!userDetailsManager.userExists("daffy")) {
-                    userDetailsManager.createUser(
-                        User.withUsername("daffy")
-                            .password(passwordEncoder.encode("duck"))
-                            .roles("USER", "MANAGER")
-                            .build()
-                    );
-                }
-            }
         };
     }
 
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            LoggingAccessDeniedHandler accessDeniedHandler) throws Exception {
+            LoggingAccessDeniedHandler accessDeniedHandler) {
 
         http
             .authorizeHttpRequests(auth -> auth
@@ -91,23 +65,23 @@ public class SecurityConfig {
                 .requestMatchers("/h2-console/**").denyAll()
 
                 // Manager-only page and write operations.
-                .requestMatchers("/manager", "/manager/**").hasRole("MANAGER")
+                .requestMatchers("/manager", "/manager/**").hasRole(ROLE_MANAGER)
                 .requestMatchers(HttpMethod.GET, "/secured/addBoardGame")
-                    .hasRole("MANAGER")
+                    .hasRole(ROLE_MANAGER)
                 .requestMatchers(HttpMethod.GET, "/*/reviews/*")
-                    .hasRole("MANAGER")
+                    .hasRole(ROLE_MANAGER)
                 .requestMatchers(HttpMethod.POST, "/boardgameAdded")
-                    .hasRole("MANAGER")
+                    .hasRole(ROLE_MANAGER)
                 .requestMatchers(HttpMethod.POST, "/deleteReview/**")
-                    .hasRole("MANAGER")
+                    .hasRole(ROLE_MANAGER)
                 .requestMatchers(HttpMethod.POST, "/boardgames")
-                    .hasRole("MANAGER")
+                    .hasRole(ROLE_MANAGER)
 
                 // Authenticated user pages and review creation.
                 .requestMatchers("/user", "/user/**", "/secured/**")
-                    .hasAnyRole("USER", "MANAGER")
+                    .hasAnyRole("USER", ROLE_MANAGER)
                 .requestMatchers(HttpMethod.POST, "/reviewAdded")
-                    .hasAnyRole("USER", "MANAGER")
+                    .hasAnyRole("USER", ROLE_MANAGER)
 
                 // Public pages and read-only REST endpoints.
                 .requestMatchers(
