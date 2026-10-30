@@ -6,7 +6,7 @@ import lombok.Data;
 @Data
 @AllArgsConstructor
 public class ErrorMessage {
-    private final String STATUS = "error";
+    private static final String status = "error";
 
     private String message;
 }

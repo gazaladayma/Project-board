@@ -34,9 +34,7 @@ public class DatabaseAccess {
 
         String query = "SELECT DISTINCT authority FROM authorities";
 
-        List<String> authorities = jdbc.queryForList(query, namedParameters, String.class);
-
-        return authorities;
+        return jdbc.queryForList(query, namedParameters, String.class);
     }
 
     public List<BoardGame> getBoardGames() {
@@ -45,8 +43,7 @@ public class DatabaseAccess {
 
         BeanPropertyRowMapper<BoardGame> boardgameMapper = new BeanPropertyRowMapper<>(BoardGame.class);
 
-        List<BoardGame> boardgames = jdbc.query(query, boardgameMapper);
-        return boardgames;
+        return jdbc.query(query, boardgameMapper);
     }
 
     public BoardGame getBoardGame(Long id) {
