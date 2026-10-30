@@ -3,6 +3,8 @@ package com.javaproject.controllers;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.security.core.Authentication;
@@ -26,6 +28,9 @@ import com.javaproject.database.DatabaseAccess;
 
 @Controller
 public class HomeController {
+
+    private static final Logger LOGGER =
+            LoggerFactory.getLogger(HomeController.class);
 
     private static final String VIEW_NEW_USER = "new-user";
     private static final String REDIRECT_HOME = "redirect:/";
@@ -133,7 +138,7 @@ public class HomeController {
     @PostMapping("/boardgameAdded")
     public String boardgameAdded(@ModelAttribute BoardGame boardgame) {
         Long returnValue = da.addBoardGame(boardgame);
-        System.out.println("return value is: " + returnValue);
+        LOGGER.info("return value is: {}", returnValue);
         return REDIRECT_HOME;
     }
 
@@ -169,7 +174,7 @@ public class HomeController {
             returnValue = da.addReview(review);
         }
 
-        System.out.println("return value is: " + returnValue);
+        LOGGER.info("return value is: {}", returnValue);
         return REDIRECT_HOME + review.getGameId() + "/reviews";
     }
 

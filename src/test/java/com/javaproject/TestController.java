@@ -146,7 +146,7 @@ class TestController {
                 .andExpect(redirectedUrl("/" + review.getGameId() + "/reviews"));
 
         review = da.getReview(reviewId);
-        assertEquals(review.getText(), "Edited text");
+        assertEquals("Edited text", review.getText());
     }
 
     @Test

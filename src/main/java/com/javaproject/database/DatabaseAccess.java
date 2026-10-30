@@ -1,5 +1,6 @@
 package com.javaproject.database;
 
+import java.util.Collections;
 import java.util.List;
 
 import javax.sql.DataSource;
@@ -42,7 +43,7 @@ public class DatabaseAccess {
 
         String query = "SELECT * FROM boardgames";
 
-        BeanPropertyRowMapper boardgameMapper = new BeanPropertyRowMapper<>(BoardGame.class);
+        BeanPropertyRowMapper<BoardGame> boardgameMapper = new BeanPropertyRowMapper<>(BoardGame.class);
 
         List<BoardGame> boardgames = jdbc.query(query, boardgameMapper);
         return boardgames;
@@ -53,7 +54,7 @@ public class DatabaseAccess {
 
         String query = "SELECT * FROM boardgames WHERE id = :id";
         namedParameters.addValue("id", id);
-        BeanPropertyRowMapper boardgameMapper = new BeanPropertyRowMapper<>(BoardGame.class);
+        BeanPropertyRowMapper<BoardGame> boardgameMapper = new BeanPropertyRowMapper<>(BoardGame.class);
         List<BoardGame> boardgames = jdbc.query(query, namedParameters, boardgameMapper);
         if (boardgames.isEmpty()) {
             return null;
@@ -67,13 +68,12 @@ public class DatabaseAccess {
 
         String query = "SELECT * FROM reviews WHERE gameId = :id";
         namedParameters.addValue("id", id);
-        BeanPropertyRowMapper reviewMapper = new BeanPropertyRowMapper<>(Review.class);
+        BeanPropertyRowMapper<Review> reviewMapper = new BeanPropertyRowMapper<>(Review.class);
         List<Review> reviews = jdbc.query(query, namedParameters, reviewMapper);
         if (reviews.isEmpty()) {
-            return null;
-        } else {
-            return reviews;
+            return Collections.emptyList();
         }
+        return reviews;
     }
 
     public Long addBoardGame(BoardGame boardgame) {
@@ -112,7 +112,7 @@ public class DatabaseAccess {
 
         String query = "SELECT * FROM reviews WHERE id = :id";
         namedParameters.addValue("id", id);
-        BeanPropertyRowMapper reviewMapper = new BeanPropertyRowMapper<>(Review.class);
+        BeanPropertyRowMapper<Review> reviewMapper = new BeanPropertyRowMapper<>(Review.class);
         List<Review> reviews = jdbc.query(query, namedParameters, reviewMapper);
         if (reviews.isEmpty()) {
             return null;
