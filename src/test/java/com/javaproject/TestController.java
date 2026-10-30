@@ -41,7 +41,7 @@ class TestController {
     }
 
     @Test
-    public void testAnonymousCannotOpenReviewEditPage() throws Exception {
+    void testAnonymousCannotOpenReviewEditPage() throws Exception {
         List<BoardGame> boardGames = da.getBoardGames();
         Long gameId = boardGames.get(0).getId();
         List<Review> reviews = da.getReviews(gameId);
@@ -52,7 +52,7 @@ class TestController {
     }
 
     @Test
-    public void testRegularUserCannotOpenReviewEditPage() throws Exception {
+    void testRegularUserCannotOpenReviewEditPage() throws Exception {
         List<BoardGame> boardGames = da.getBoardGames();
         Long gameId = boardGames.get(0).getId();
         List<Review> reviews = da.getReviews(gameId);
@@ -65,7 +65,7 @@ class TestController {
     }
 
     @Test
-    public void testManagerCanOpenReviewEditPage() throws Exception {
+    void testManagerCanOpenReviewEditPage() throws Exception {
         List<BoardGame> boardGames = da.getBoardGames();
         Long gameId = boardGames.get(0).getId();
         List<Review> reviews = da.getReviews(gameId);
@@ -78,7 +78,7 @@ class TestController {
     }
 
     @Test
-    public void testManagerCannotOpenReviewWithMismatchedGameId() throws Exception {
+    void testManagerCannotOpenReviewWithMismatchedGameId() throws Exception {
         List<BoardGame> boardGames = da.getBoardGames();
         if (boardGames.size() < 2) {
             throw new AssertionError("Test requires at least two board games.");
@@ -101,14 +101,14 @@ class TestController {
     }
 
     @Test
-    public void testRoot() throws Exception {
+    void testRoot() throws Exception {
         mockMvc.perform(get("/"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("index"));
     }
 
     @Test
-    public void testAddBoardGame() throws Exception {
+    void testAddBoardGame() throws Exception {
         LinkedMultiValueMap<String, String> requestParams = new LinkedMultiValueMap<>();
 
         requestParams.add("name", "onecard");
@@ -129,7 +129,7 @@ class TestController {
     }
 
     @Test
-    public void testEditReview() throws Exception {
+    void testEditReview() throws Exception {
         List<BoardGame> boardGames = da.getBoardGames();
         Long boardgameId = boardGames.get(0).getId();
 
@@ -150,7 +150,7 @@ class TestController {
     }
 
     @Test
-    public void testRegularUserCannotEditReview() throws Exception {
+    void testRegularUserCannotEditReview() throws Exception {
         List<BoardGame> boardGames = da.getBoardGames();
         Long boardgameId = boardGames.get(0).getId();
 
@@ -173,7 +173,7 @@ class TestController {
     }
 
     @Test
-    public void testManagerCannotEditReviewWithMismatchedGameId() throws Exception {
+    void testManagerCannotEditReviewWithMismatchedGameId() throws Exception {
         List<BoardGame> boardGames = da.getBoardGames();
         if (boardGames.size() < 2) {
             throw new AssertionError("Test requires at least two board games.");
@@ -207,7 +207,7 @@ class TestController {
     }
 
     @Test
-    public void testRegularUserCannotDeleteReview() throws Exception {
+    void testRegularUserCannotDeleteReview() throws Exception {
         List<BoardGame> boardGames = da.getBoardGames();
         Long boardgameId = boardGames.get(0).getId();
 
@@ -226,7 +226,7 @@ class TestController {
     }
 
     @Test
-    public void testDeleteReview() throws Exception {
+    void testDeleteReview() throws Exception {
         List<BoardGame> boardGames = da.getBoardGames();
         Long boardgameId = boardGames.get(0).getId();
 
@@ -246,7 +246,7 @@ class TestController {
         assertEquals(newSize, origSize - 1);
     }
     @Test
-    public void testManagerCanCreateBoardGameThroughApi() throws Exception {
+    void testManagerCanCreateBoardGameThroughApi() throws Exception {
         String json = """
                 {
                     "name": "api-security-test-game",
@@ -266,7 +266,7 @@ class TestController {
     }
 
     @Test
-    public void testRegularUserCannotCreateBoardGameThroughApi() throws Exception {
+    void testRegularUserCannotCreateBoardGameThroughApi() throws Exception {
         String json = """
                 {
                     "name": "api-user-denied-test-game",
@@ -291,7 +291,7 @@ class TestController {
     }
 
     @Test
-    public void testAnonymousCannotCreateBoardGameThroughApi() throws Exception {
+    void testAnonymousCannotCreateBoardGameThroughApi() throws Exception {
         String json = """
                 {
                     "name": "api-anonymous-denied-test-game",
@@ -310,12 +310,12 @@ class TestController {
     }
 
     @Test
-    public void testBoardGamesApiGetIsPublic() throws Exception {
+    void testBoardGamesApiGetIsPublic() throws Exception {
         mockMvc.perform(get("/boardgames"))
                 .andExpect(status().isOk());
     }
 @Test
-public void testBoardGameApiRejectsMissingCsrfToken() throws Exception {
+void testBoardGameApiRejectsMissingCsrfToken() throws Exception {
     String json = """
             {
                 "name": "csrf-missing-token-test-game",

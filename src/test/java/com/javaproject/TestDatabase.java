@@ -25,7 +25,7 @@ class TestDatabase {
     }
 
     @Test
-    public void testDatabaseAddBoardGame() {
+    void testDatabaseAddBoardGame() {
         BoardGame boardGame = new BoardGame();
         boardGame.setName("onecard");
         boardGame.setLevel(1);
