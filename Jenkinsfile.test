@@ -71,6 +71,11 @@ pipeline {
                     echo "===== DOCKER DISK USAGE ====="
                     docker system df
 
+                    echo "===== USING JENKINS WORKSPACE FOR TEMP FILES ====="
+                    mkdir -p "$WORKSPACE/.tmp"
+                    export TMPDIR="$WORKSPACE/.tmp"
+                    df -h "$TMPDIR"
+
                     trivy image --scanners vuln \
                       --severity HIGH,CRITICAL \
                       --exit-code 1 \
